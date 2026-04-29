@@ -8,11 +8,10 @@ import 'storage.dart';
 
 const String _kPrefix = 'talerid:';
 const String _kAccess = '${_kPrefix}access_token';
-// ignore: unused_element
 const String _kRefresh = '${_kPrefix}refresh_token';
-// ignore: unused_element
 const String _kId = '${_kPrefix}id_token';
 const String _kExpires = '${_kPrefix}expires_at';
+// ignore: unused_element
 const String _kUser = '${_kPrefix}user';
 
 const String _defaultIssuer = 'https://id.taler.tirol/oauth';
@@ -42,9 +41,9 @@ class TalerIdClient {
   /// Token storage layer; defaults to [SecureStorage].
   final Storage storage;
 
-  final OAuthBackend _backend; // ignore: unused_field
+  final OAuthBackend _backend;
   final http.Client _http; // ignore: unused_field
-  final LogCallback _log; // ignore: unused_field
+  final LogCallback _log;
 
   final ValueNotifier<AuthState> _state;
 
@@ -126,8 +125,58 @@ class TalerIdClient {
 
   /// Internal helper used by future tasks. Replaces the current state and
   /// notifies listeners only when the new state differs by [AuthState] equality.
-  // ignore: unused_element
   void _emit(AuthState next) {
     if (next != _state.value) _state.value = next;
+  }
+
+  /// Run the full authorize-and-exchange-code flow.
+  /// Opens an in-app browser, returns when tokens are stored.
+  /// Throws [TalerIdAuthError] on cancellation, network failure, or state mismatch.
+  Future<void> login() async {
+    _emit(_state.value.copyWith(isLoading: true));
+    try {
+      final tokens = await _backend.authorizeAndExchangeCode(
+        clientId: clientId,
+        redirectUri: redirectUri,
+        issuer: issuer,
+        scopes: scope.split(' '),
+      );
+      await _persistTokens(tokens);
+      _emit(AuthState(
+        user: _state.value.user,
+        isAuthenticated: true,
+        isLoading: false,
+      ));
+      _log('info', 'login complete', {'scope': scope});
+    } on TalerIdAuthError {
+      _emit(_state.value.copyWith(isLoading: false));
+      rethrow;
+    } catch (err) {
+      _emit(_state.value.copyWith(isLoading: false));
+      // Map underlying error to a TalerIdAuthError. Users dismissing the in-app browser
+      // surfaces here as a PlatformException; we attribute anything we can't classify
+      // as `userCancelled` since it is by far the most common cause.
+      throw TalerIdAuthError(
+        code: TalerIdErrorCode.userCancelled,
+        message: 'login failed',
+        cause: err,
+      );
+    }
+  }
+
+  Future<void> _persistTokens(OAuthTokens tokens) async {
+    await storage.set(_kAccess, tokens.accessToken);
+    if (tokens.refreshToken != null) {
+      await storage.set(_kRefresh, tokens.refreshToken!);
+    }
+    if (tokens.idToken != null) {
+      await storage.set(_kId, tokens.idToken!);
+    }
+    if (tokens.expiresAt != null) {
+      await storage.set(
+        _kExpires,
+        tokens.expiresAt!.millisecondsSinceEpoch.toString(),
+      );
+    }
   }
 }

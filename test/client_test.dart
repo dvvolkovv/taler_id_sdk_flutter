@@ -115,4 +115,64 @@ void main() {
       expect(client.authState.value.isAuthenticated, isFalse);
     });
   });
+
+  group('TalerIdClient — login', () {
+    late MemoryStorage storage;
+    late FakeOAuthBackend backend;
+    late TalerIdClient client;
+
+    setUp(() async {
+      storage = MemoryStorage();
+      backend = FakeOAuthBackend();
+      client = await TalerIdClient.create(
+        clientId: 'c',
+        redirectUri: 'app://cb',
+        storage: storage,
+        backend: backend,
+      );
+    });
+
+    test('stores tokens, emits authenticated state, returns when done', () async {
+      backend.nextAuthorizeResult = OAuthTokens(
+        accessToken: 'AT',
+        refreshToken: 'RT',
+        idToken: 'IT',
+        expiresAt: DateTime.now().add(const Duration(minutes: 15)),
+      );
+
+      await client.login();
+
+      expect(client.isAuthenticated, isTrue);
+      expect(client.authState.value.isAuthenticated, isTrue);
+      expect(await storage.get('talerid:access_token'), 'AT');
+      expect(await storage.get('talerid:refresh_token'), 'RT');
+      expect(await storage.get('talerid:id_token'), 'IT');
+      final expires = int.parse((await storage.get('talerid:expires_at'))!);
+      expect(expires, greaterThan(DateTime.now().millisecondsSinceEpoch));
+    });
+
+    test('maps backend cancellation to TalerIdAuthError', () async {
+      backend.nextAuthorizeError = StateError('User cancelled flow');
+      await expectLater(
+        client.login(),
+        throwsA(isA<TalerIdAuthError>()),
+      );
+      // Even on error, state stays unauthenticated.
+      expect(client.isAuthenticated, isFalse);
+    });
+
+    test('isLoading is true during login flow', () async {
+      var sawLoading = false;
+      client.authState.addListener(() {
+        if (client.authState.value.isLoading) sawLoading = true;
+      });
+      backend.nextAuthorizeResult = OAuthTokens(
+        accessToken: 'AT',
+        expiresAt: DateTime.now().add(const Duration(minutes: 15)),
+      );
+      await client.login();
+      expect(sawLoading, isTrue);
+      expect(client.authState.value.isLoading, isFalse);
+    });
+  });
 }
