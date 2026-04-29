@@ -247,6 +247,27 @@ class TalerIdClient {
     _emit(const AuthState(user: null, isAuthenticated: false, isLoading: false));
   }
 
+  /// Logs the user out. Always clears local storage and emits unauthenticated state.
+  /// If [endSession] is true, opens an in-app browser to the OIDC `session/end` endpoint
+  /// (RP-initiated logout) using the stored id_token as `id_token_hint`. On a fresh-installed
+  /// device or after data clear, this is a no-op locally.
+  Future<void> logout({bool endSession = false}) async {
+    final idToken = await storage.get(_kId);
+    await _clearSession();
+    if (endSession && idToken != null) {
+      try {
+        await _backend.endSession(
+          issuer: issuer,
+          idTokenHint: idToken,
+          postLogoutRedirectUri: redirectUri,
+        );
+      } catch (err) {
+        // Logout must succeed locally even if the browser flow fails.
+        _log('warn', 'endSession failed; local logout already complete', err);
+      }
+    }
+  }
+
   /// Fetches userinfo from `/oauth/me`. First call hits the network and caches in storage;
   /// subsequent calls return the cached value.
   /// Throws [TalerIdAuthError] on network errors or non-200 responses.
