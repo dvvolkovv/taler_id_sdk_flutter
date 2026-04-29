@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -46,6 +47,7 @@ class TalerIdClient {
   final LogCallback _log;
 
   final ValueNotifier<AuthState> _state;
+  Completer<String>? _refreshInFlight;
 
   /// Reactive auth state. Use with [ValueListenableBuilder].
   ValueListenable<AuthState> get authState => _state;
@@ -180,8 +182,8 @@ class TalerIdClient {
     }
   }
 
-  /// Returns the current access token. Refresh logic added in Task 9.
-  /// Throws [TalerIdAuthError] with [TalerIdErrorCode.loginRequired] when there is no active session.
+  /// Returns the current access token, auto-refreshing if within 30s of expiry.
+  /// Throws [TalerIdAuthError] with [TalerIdErrorCode.loginRequired] when no active session.
   Future<String> getAccessToken() async {
     final token = await storage.get(_kAccess);
     final expiresRaw = await storage.get(_kExpires);
@@ -191,7 +193,58 @@ class TalerIdClient {
         message: 'No active session',
       );
     }
-    return token;
+    final expiresAt = int.tryParse(expiresRaw) ?? 0;
+    if (expiresAt - DateTime.now().millisecondsSinceEpoch > 30000) {
+      return token;
+    }
+    return _refreshAccessToken();
+  }
+
+  Future<String> _refreshAccessToken() {
+    if (_refreshInFlight != null) return _refreshInFlight!.future;
+    final completer = Completer<String>();
+    _refreshInFlight = completer;
+
+    () async {
+      final refreshToken = await storage.get(_kRefresh);
+      if (refreshToken == null) {
+        await _clearSession();
+        completer.completeError(TalerIdAuthError(
+          code: TalerIdErrorCode.loginRequired,
+          message: 'No refresh token',
+        ));
+        return;
+      }
+      try {
+        final tokens = await _backend.refresh(
+          clientId: clientId,
+          issuer: issuer,
+          refreshToken: refreshToken,
+        );
+        await _persistTokens(tokens);
+        completer.complete(tokens.accessToken);
+      } catch (err) {
+        await _clearSession();
+        completer.completeError(TalerIdAuthError(
+          code: TalerIdErrorCode.loginRequired,
+          message: 'Refresh request failed',
+          cause: err,
+        ));
+      } finally {
+        _refreshInFlight = null;
+      }
+    }();
+
+    return completer.future;
+  }
+
+  Future<void> _clearSession() async {
+    await storage.remove(_kAccess);
+    await storage.remove(_kRefresh);
+    await storage.remove(_kId);
+    await storage.remove(_kExpires);
+    await storage.remove(_kUser);
+    _emit(const AuthState(user: null, isAuthenticated: false, isLoading: false));
   }
 
   /// Fetches userinfo from `/oauth/me`. First call hits the network and caches in storage;
