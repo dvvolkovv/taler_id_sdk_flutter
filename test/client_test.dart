@@ -1,5 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:talerid_oauth/talerid_oauth.dart';
 import 'package:talerid_oauth/src/oauth_backend.dart';
 
@@ -173,6 +176,82 @@ void main() {
       await client.login();
       expect(sawLoading, isTrue);
       expect(client.authState.value.isLoading, isFalse);
+    });
+  });
+
+  group('TalerIdClient — getAccessToken / getUser', () {
+    late MemoryStorage storage;
+    late FakeOAuthBackend backend;
+
+    Future<TalerIdClient> makeClient({http.Client? httpClient}) =>
+        TalerIdClient.create(
+          clientId: 'c',
+          redirectUri: 'app://cb',
+          storage: storage,
+          backend: backend,
+          httpClient: httpClient,
+        );
+
+    setUp(() async {
+      storage = MemoryStorage();
+      backend = FakeOAuthBackend();
+      await storage.set('talerid:access_token', 'AT');
+      await storage.set(
+        'talerid:expires_at',
+        DateTime.now().add(const Duration(minutes: 1)).millisecondsSinceEpoch.toString(),
+      );
+    });
+
+    test('getAccessToken returns cached token when not near expiry', () async {
+      final client = await makeClient();
+      expect(await client.getAccessToken(), 'AT');
+    });
+
+    test('getAccessToken throws loginRequired when no token in storage', () async {
+      await storage.remove('talerid:access_token');
+      await storage.remove('talerid:expires_at');
+      final client = await makeClient();
+      await expectLater(
+        client.getAccessToken(),
+        throwsA(isA<TalerIdAuthError>()
+            .having((e) => e.code, 'code', TalerIdErrorCode.loginRequired)),
+      );
+    });
+
+    test('getUser fetches /oauth/me with Bearer header, caches result', () async {
+      var calls = 0;
+      final mockHttp = MockClient((req) async {
+        calls += 1;
+        expect(req.url.toString(), 'https://id.taler.tirol/oauth/me');
+        expect(req.headers['authorization'], 'Bearer AT');
+        return http.Response(
+          jsonEncode({'sub': 'user-1', 'email': 'u@x.com'}),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+      final client = await makeClient(httpClient: mockHttp);
+      final user = await client.getUser();
+      expect(user.sub, 'user-1');
+      expect(user.email, 'u@x.com');
+      expect(calls, 1);
+
+      // second call hits cache
+      final user2 = await client.getUser();
+      expect(user2, equals(user));
+      expect(calls, 1);
+    });
+
+    test('getUser throws network on fetch failure', () async {
+      final mockHttp = MockClient((req) async {
+        throw http.ClientException('Failed to fetch');
+      });
+      final client = await makeClient(httpClient: mockHttp);
+      await expectLater(
+        client.getUser(),
+        throwsA(isA<TalerIdAuthError>()
+            .having((e) => e.code, 'code', TalerIdErrorCode.network)),
+      );
     });
   });
 }

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
@@ -11,7 +12,6 @@ const String _kAccess = '${_kPrefix}access_token';
 const String _kRefresh = '${_kPrefix}refresh_token';
 const String _kId = '${_kPrefix}id_token';
 const String _kExpires = '${_kPrefix}expires_at';
-// ignore: unused_element
 const String _kUser = '${_kPrefix}user';
 
 const String _defaultIssuer = 'https://id.taler.tirol/oauth';
@@ -42,7 +42,7 @@ class TalerIdClient {
   final Storage storage;
 
   final OAuthBackend _backend;
-  final http.Client _http; // ignore: unused_field
+  final http.Client _http;
   final LogCallback _log;
 
   final ValueNotifier<AuthState> _state;
@@ -178,5 +178,53 @@ class TalerIdClient {
         tokens.expiresAt!.millisecondsSinceEpoch.toString(),
       );
     }
+  }
+
+  /// Returns the current access token. Refresh logic added in Task 9.
+  /// Throws [TalerIdAuthError] with [TalerIdErrorCode.loginRequired] when there is no active session.
+  Future<String> getAccessToken() async {
+    final token = await storage.get(_kAccess);
+    final expiresRaw = await storage.get(_kExpires);
+    if (token == null || expiresRaw == null) {
+      throw TalerIdAuthError(
+        code: TalerIdErrorCode.loginRequired,
+        message: 'No active session',
+      );
+    }
+    return token;
+  }
+
+  /// Fetches userinfo from `/oauth/me`. First call hits the network and caches in storage;
+  /// subsequent calls return the cached value.
+  /// Throws [TalerIdAuthError] on network errors or non-200 responses.
+  Future<UserInfo> getUser() async {
+    final cachedJson = await storage.get(_kUser);
+    if (cachedJson != null) return UserInfo.fromJsonString(cachedJson);
+
+    final token = await getAccessToken();
+    http.Response response;
+    try {
+      response = await _http.get(
+        Uri.parse('$issuer/me'),
+        headers: {'authorization': 'Bearer $token'},
+      );
+    } catch (err) {
+      throw TalerIdAuthError(
+        code: TalerIdErrorCode.network,
+        message: 'userinfo request failed',
+        cause: err,
+      );
+    }
+    if (response.statusCode != 200) {
+      throw TalerIdAuthError(
+        code: TalerIdErrorCode.loginRequired,
+        message: 'userinfo returned ${response.statusCode}',
+      );
+    }
+    final json = jsonDecode(response.body) as Map<String, Object?>;
+    final user = UserInfo.fromJson(json);
+    await storage.set(_kUser, user.toJsonString());
+    _emit(_state.value.copyWith(user: user));
+    return user;
   }
 }
