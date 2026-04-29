@@ -26,7 +26,10 @@ void main() {
       await storage.set('talerid:refresh_token', 'RT');
       await storage.set(
         'talerid:expires_at',
-        DateTime.now().add(const Duration(seconds: 5)).millisecondsSinceEpoch.toString(),
+        DateTime.now()
+            .add(const Duration(seconds: 5))
+            .millisecondsSinceEpoch
+            .toString(),
       );
     });
 
@@ -83,7 +86,10 @@ void main() {
     test('does NOT refresh when access_token has >30s of life left', () async {
       await storage.set(
         'talerid:expires_at',
-        DateTime.now().add(const Duration(minutes: 1)).millisecondsSinceEpoch.toString(),
+        DateTime.now()
+            .add(const Duration(minutes: 1))
+            .millisecondsSinceEpoch
+            .toString(),
       );
       final client = await makeClient();
       final token = await client.getAccessToken();

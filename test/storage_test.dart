@@ -26,11 +26,13 @@ void main() {
   group('SecureStorage', () {
     setUp(() {
       // flutter_secure_storage uses a method channel — mock it.
-      const channel = MethodChannel('plugins.it_nomads.com/flutter_secure_storage');
+      const channel =
+          MethodChannel('plugins.it_nomads.com/flutter_secure_storage');
       final store = <String, String>{};
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(channel, (call) async {
-        final args = (call.arguments as Map?)?.cast<String, Object?>() ?? const {};
+        final args =
+            (call.arguments as Map?)?.cast<String, Object?>() ?? const {};
         switch (call.method) {
           case 'write':
             store[args['key'] as String] = args['value'] as String;
@@ -50,7 +52,8 @@ void main() {
       });
     });
 
-    test('round-trips get/set/remove via flutter_secure_storage channel', () async {
+    test('round-trips get/set/remove via flutter_secure_storage channel',
+        () async {
       final s = SecureStorage();
       expect(await s.get('talerid:k'), isNull);
       await s.set('talerid:k', 'v');

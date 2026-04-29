@@ -92,11 +92,15 @@ void main() {
       expect(client.isAuthenticated, isFalse);
     });
 
-    test('isAuthenticated true when access_token + future expires_at present', () async {
+    test('isAuthenticated true when access_token + future expires_at present',
+        () async {
       await storage.set('talerid:access_token', 'AT');
       await storage.set(
         'talerid:expires_at',
-        DateTime.now().add(const Duration(minutes: 1)).millisecondsSinceEpoch.toString(),
+        DateTime.now()
+            .add(const Duration(minutes: 1))
+            .millisecondsSinceEpoch
+            .toString(),
       );
       final client = await TalerIdClient.create(
         clientId: 'c',
@@ -135,7 +139,8 @@ void main() {
       );
     });
 
-    test('stores tokens, emits authenticated state, returns when done', () async {
+    test('stores tokens, emits authenticated state, returns when done',
+        () async {
       backend.nextAuthorizeResult = OAuthTokens(
         accessToken: 'AT',
         refreshToken: 'RT',
@@ -198,7 +203,10 @@ void main() {
       await storage.set('talerid:access_token', 'AT');
       await storage.set(
         'talerid:expires_at',
-        DateTime.now().add(const Duration(minutes: 1)).millisecondsSinceEpoch.toString(),
+        DateTime.now()
+            .add(const Duration(minutes: 1))
+            .millisecondsSinceEpoch
+            .toString(),
       );
     });
 
@@ -207,7 +215,8 @@ void main() {
       expect(await client.getAccessToken(), 'AT');
     });
 
-    test('getAccessToken throws loginRequired when no token in storage', () async {
+    test('getAccessToken throws loginRequired when no token in storage',
+        () async {
       await storage.remove('talerid:access_token');
       await storage.remove('talerid:expires_at');
       final client = await makeClient();
@@ -218,7 +227,8 @@ void main() {
       );
     });
 
-    test('getUser fetches /oauth/me with Bearer header, caches result', () async {
+    test('getUser fetches /oauth/me with Bearer header, caches result',
+        () async {
       var calls = 0;
       final mockHttp = MockClient((req) async {
         calls += 1;

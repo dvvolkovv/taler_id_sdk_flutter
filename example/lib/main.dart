@@ -19,7 +19,10 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Taler ID — Example',
-      theme: ThemeData(useMaterial3: true, colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF167EF2))),
+      theme: ThemeData(
+          useMaterial3: true,
+          colorScheme:
+              ColorScheme.fromSeed(seedColor: const Color(0xFF167EF2))),
       home: HomePage(client: client),
     );
   }
@@ -73,7 +76,8 @@ class _AuthenticatedView extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Hello, ${user.name ?? user.sub}', style: Theme.of(context).textTheme.headlineSmall),
+              Text('Hello, ${user.name ?? user.sub}',
+                  style: Theme.of(context).textTheme.headlineSmall),
               const SizedBox(height: 8),
               if (user.email != null) Text(user.email!),
               const SizedBox(height: 24),

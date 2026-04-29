@@ -4,7 +4,8 @@ import 'package:talerid_oauth/src/auth_state.dart';
 void main() {
   group('UserInfo', () {
     test('exposes sub and arbitrary claims', () {
-      final user = const UserInfo(sub: 'u-1', claims: {'email': 'u@example.com', 'name': 'Alice'});
+      final user = const UserInfo(
+          sub: 'u-1', claims: {'email': 'u@example.com', 'name': 'Alice'});
       expect(user.sub, 'u-1');
       expect(user.email, 'u@example.com');
       expect(user.name, 'Alice');

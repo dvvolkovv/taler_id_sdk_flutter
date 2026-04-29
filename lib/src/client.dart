@@ -19,7 +19,8 @@ const String _defaultIssuer = 'https://id.taler.tirol/oauth';
 const String _defaultScope = 'openid profile email';
 
 /// Optional logger callback. Levels: `'debug'`, `'info'`, `'warn'`, `'error'`.
-typedef LogCallback = void Function(String level, String message, [Object? meta]);
+typedef LogCallback = void Function(String level, String message,
+    [Object? meta]);
 
 /// Browser SDK for Sign in with Taler ID.
 ///
@@ -244,7 +245,8 @@ class TalerIdClient {
     await storage.remove(_kId);
     await storage.remove(_kExpires);
     await storage.remove(_kUser);
-    _emit(const AuthState(user: null, isAuthenticated: false, isLoading: false));
+    _emit(
+        const AuthState(user: null, isAuthenticated: false, isLoading: false));
   }
 
   /// Logs the user out. Always clears local storage and emits unauthenticated state.

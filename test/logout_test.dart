@@ -18,12 +18,16 @@ void main() {
       await storage.set('talerid:id_token', 'IT');
       await storage.set(
         'talerid:expires_at',
-        DateTime.now().add(const Duration(minutes: 1)).millisecondsSinceEpoch.toString(),
+        DateTime.now()
+            .add(const Duration(minutes: 1))
+            .millisecondsSinceEpoch
+            .toString(),
       );
       await storage.set('talerid:user', '{"sub":"u"}');
     });
 
-    test('silent logout clears storage and emits unauthenticated state', () async {
+    test('silent logout clears storage and emits unauthenticated state',
+        () async {
       final client = await TalerIdClient.create(
         clientId: 'c',
         redirectUri: 'app://cb',
@@ -40,7 +44,8 @@ void main() {
       expect(backend.endSessionCalled, isFalse);
     });
 
-    test('logout(endSession: true) calls backend.endSession with id_token_hint', () async {
+    test('logout(endSession: true) calls backend.endSession with id_token_hint',
+        () async {
       final client = await TalerIdClient.create(
         clientId: 'c',
         redirectUri: 'app://cb',
