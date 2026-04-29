@@ -1,0 +1,22 @@
+name: talerid_oauth_example
+description: Example app for the talerid_oauth SDK.
+publish_to: none
+version: 0.0.1+1
+
+environment:
+  sdk: ^3.5.0
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  talerid_oauth:
+    path: ..
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
